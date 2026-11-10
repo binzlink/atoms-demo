@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "atoms-demo-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-10",
+  "account_id": "7a920093aa588cc2324ffe58ecbbf81a",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
+  },
+  "ai": {
+    "binding": "AI",
+    "remote": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "atoms-demo",
+      "database_id": "a2bc61c4-2b08-4449-b95b-fce592ba1892",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "api.ai111.ai",
+      "custom_domain": true
+    },
+    {
+      "pattern": "ai111.ai/p/*",
+      "zone_name": "ai111.ai"
+    }
+  ]
+}

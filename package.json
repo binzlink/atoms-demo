@@ -1,0 +1,10 @@
+{
+  "name": "atoms-demo",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel --filter @atoms/web --filter @atoms/api dev",
+    "build": "pnpm -r --if-present build",
+    "test": "pnpm --filter @atoms/api test",
+    "typecheck": "pnpm -r --if-present typecheck"
+  }
+}
