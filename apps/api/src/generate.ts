@@ -3,11 +3,11 @@ import { allocateId, findProject, insertProject, listMessages, projectDetail, sa
 import type { Env } from "./env.ts";
 import { json, log } from "./http.ts";
 import { streamModel } from "./model.ts";
-import { parseGeneration, type Generation } from "./parse.ts";
-import { createUserPrompt, reviseUserPrompt, SYSTEM_PROMPT } from "./prompt.ts";
+import { isCompleteOutput, resolveGeneration, stitch, type Generation } from "./parse.ts";
+import { CONTINUE_PROMPT, createUserPrompt, REVISE_SYSTEM_PROMPT, reviseUserPrompt, SYSTEM_PROMPT } from "./prompt.ts";
 import { eventStream, noteDeltas } from "./stream.ts";
 
-type ModelMessage = { role: "system" | "user"; content: string };
+type ModelMessage = { role: "system" | "user" | "assistant"; content: string };
 
 export function createProject(env: Env, prompt: string): Response {
   return eventStream(async (emit) => {
@@ -36,11 +36,12 @@ export async function reviseProject(env: Env, id: string, prompt: string): Promi
     const parsed = await generate(
       env,
       [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: REVISE_SYSTEM_PROMPT },
         { role: "user", content: reviseUserPrompt(prompt, existing.current_html, history) },
       ],
       emit,
       "正在理解这次修改",
+      existing.current_html,
     );
     if ("error" in parsed) {
       log("revise", { ok: false, id, ms: Date.now() - started });
@@ -55,8 +56,19 @@ export async function reviseProject(env: Env, id: string, prompt: string): Promi
   });
 }
 
-async function generate(env: Env, messages: ModelMessage[], emit: (event: StreamEvent) => void, opening: string): Promise<Generation | { error: string }> {
+async function generate(
+  env: Env,
+  messages: ModelMessage[],
+  emit: (event: StreamEvent) => void,
+  opening: string,
+  baseHtml?: string,
+): Promise<Generation | { error: string }> {
   emit({ type: "status", text: opening });
-  const raw = await streamModel(env.AI, messages, noteDeltas(emit, opening));
-  return parseGeneration(raw);
+  let raw = await streamModel(env.AI, messages, noteDeltas(emit, opening));
+  for (let attempt = 0; attempt < 2 && !isCompleteOutput(raw); attempt += 1) {
+    emit({ type: "status", text: "正在续写页面" });
+    const more = await streamModel(env.AI, [...messages, { role: "assistant", content: raw }, { role: "user", content: CONTINUE_PROMPT }], () => {});
+    raw = stitch(raw, more);
+  }
+  return resolveGeneration(raw, baseHtml);
 }
